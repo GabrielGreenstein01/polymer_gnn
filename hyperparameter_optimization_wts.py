@@ -1,0 +1,138 @@
+import os
+import argparse
+import torch
+import random
+from rdkit import Chem
+from rdkit.Chem import Draw
+from rdkit.Chem.Draw import IPythonConsole
+
+from utils.create_dataset_class import DataSet
+from utils.multiclass_NN import multiclass_NN
+from utils.split_dataset import split
+from utils.scale_graph_features import scale
+
+import optuna
+import optunahub
+from optuna.distributions import FloatDistribution, IntDistribution, CategoricalDistribution
+
+from utils.HEBO.sampler import HEBOSampler
+
+import numpy as np
+import joblib
+
+class HyperparameterOptimization:
+    def __init__(self, seed, GPU, model, num_epochs, num_trials):
+        # Generic parameters
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(GPU)
+        self.DESCRIPTORS = 'feature_engineering/unique_descriptors.json'
+        self.SEED = seed
+        self.TASK = 'classification'
+        self.MODEL = model
+        self.LABELNAME = '3_classes'
+        self.NUM_EPOCHS = num_epochs
+        self.NUM_WORKERS = os.cpu_count()
+        self.MODEL_PATH = './past_trials/' + model + '/hyperparameter_optimization'
+        self.SAVE_MODEL = True
+        self.SAVE_OPT = True
+        self.SAVE_CONFIG = True
+        self.CUSTOM_PARAMS = {}
+
+        # Train/validation dataset setup
+        self.db_file = 'data_preprocessing/db.csv'
+        self.SPLIT_RATIO = '0.4,0.3,0.3' # Train, Val, Test
+        self.SMILES = 'data_preprocessing/SMILES.txt'
+
+        split_db = split(self.db_file, self.SEED, self.SPLIT_RATIO)
+
+        self.scalers, scaled_feats = scale(split_db, self.SMILES, self.DESCRIPTORS)
+
+        # Fix features for bonds
+        for bond_type in scaled_feats['bond'].keys():
+            num_features = len(scaled_feats['bond'][bond_type])
+            scaled_feats['bond'][bond_type] = np.zeros(num_features)
+
+        self.dataset = DataSet(self.db_file, scaled_feats, split_db, self.LABELNAME, self.TASK, self.MODEL)
+
+    def objective(self, trial):
+        # The parameters are automatically suggested based on the search space
+        wt1 = trial.suggest_float('wt1', 0.1, 1.0, log=True) # original: 1e-2
+        wt2 = trial.suggest_float('wt2', 0.5, 2.0, log=True) # original: 1e-3
+        wt3 = trial.suggest_float('wt3', 0.5, 2.0, log=True) # original: 1e-3
+
+        params = {
+            'wt1': wt1,
+            'wt2': wt2,
+            'wt3': wt3
+        }
+
+        # if self.MODEL not in ["Weave", "MPNN"]:
+        #     dropout = trial.suggest_float('dropout', 0.0, 0.5)
+        #     params['dropout'] = dropout
+
+        new_path = self.MODEL_PATH + '/model_' + str(trial.number)
+        multiclassNN = multiclass_NN(dataset=self.dataset, 
+                               MODEL=self.MODEL, 
+                               NUM_EPOCHS=self.NUM_EPOCHS, 
+                               NUM_WORKERS=self.NUM_WORKERS,
+                               DESCRIPTORS=self.DESCRIPTORS,
+                               CUSTOM_PARAMS=params,
+                               MODEL_PATH=new_path,
+                               SAVE_MODEL=self.SAVE_MODEL,
+                               SAVE_OPT=self.SAVE_OPT,
+                               SAVE_CONFIG=self.SAVE_CONFIG)
+
+        return multiclassNN.main()
+
+    def run_hpo(self, num_trials, rand_samples):
+        # Initialize Optuna Study
+        # module = optunahub.load_module("samplers/hebo")
+        # HEBOSampler = module.HEBOSampler
+
+        search_space = {
+            'wt1': FloatDistribution(0.1, 1.0, log=True),
+            'wt2': FloatDistribution(0.5, 2.0, log=True),
+            'wt3': FloatDistribution(0.5, 2.0, log=True)
+        }
+
+        # Only add 'dropout' to the search space if the model is not "Weave" or "MPNN"
+        # if self.MODEL not in ["Weave", "MPNN"]:
+        #     search_space['dropout'] = FloatDistribution(0.0, 0.5)
+        
+        sampler = HEBOSampler(search_space, rand_sample=rand_samples)
+
+        # Define the path for your database
+        db_directory = 'past_trials/' + self.MODEL
+        db_path = os.path.join(db_directory, self.MODEL + '_hpo.db')
+        db_url = f'sqlite:///{db_path}'
+
+        # Create the directory if it doesn't exist
+        os.makedirs(db_directory, exist_ok=True)
+        joblib.dump(self.scalers, db_directory + '/scalers.pkl')
+
+        # Create a study object with the SQLite storage
+        study = optuna.create_study(
+            study_name="hebo",
+            sampler=sampler,
+            direction="minimize",
+            storage=db_url,  # Use SQLite as the storage backend
+            load_if_exists=True  # Load the study if it already exists
+        )
+
+        study.optimize(self.objective, n_trials=num_trials)
+
+
+# Main block to parse command-line arguments and run optimization
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Hyperparameter optimization")
+    parser.add_argument("--seed", type=int, required=True, help="Seed for splitting data")
+    parser.add_argument("--GPU", type=str, required=True, help="GPU to use for the optimization")
+    parser.add_argument("--model", type=str, required=True, help="Model name")
+    parser.add_argument("--num_epochs", type=int, required=True, help="Number of epochs per trial")
+    parser.add_argument("--num_trials", type=int, required=True, help="Number of trials for optimization")
+    parser.add_argument("--rand_samples", type=int, required=True, help="Number of initial random samples to explore landscape")
+
+    args = parser.parse_args()
+
+    optimizer = HyperparameterOptimization(seed=args.seed, GPU=args.GPU, model=args.model, num_epochs=args.num_epochs,
+                                           num_trials=args.num_trials)
+    optimizer.run_hpo(num_trials=args.num_trials, rand_samples=args.rand_samples)

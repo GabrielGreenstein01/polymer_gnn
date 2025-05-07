@@ -1,0 +1,55 @@
+type,molecule,SMILES,description
+monomer,G,C(C(=O)O)N,Glycine
+monomer,A,C[C@@H](C(=O)O)N,Alanine
+monomer,L,CC(C)C[C@@H](C(=O)O)N,Leucine
+monomer,M,CSCC[C@@H](C(=O)O)N,Methionine
+monomer,F,C1=CC=C(C=C1)C[C@@H](C(=O)O)N,Phenylalanine
+monomer,W,C1=CC=C2C(=C1)C(=CN2)C[C@@H](C(=O)O)N,Tryptophan
+monomer,K,C(CCN)C[C@@H](C(=O)O)N,Lysine
+monomer,Q,C(CC(=O)N)[C@@H](C(=O)O)N,Glutamine
+monomer,E,C(CC(=O)O)[C@@H](C(=O)O)N,Glutamic Acid
+monomer,S,C([C@@H](C(=O)O)N)O,Serine
+monomer,P,C1C[C@H](NC1)C(=O)O,Proline
+monomer,V,CC(C)[C@@H](C(=O)O)N,Valine
+monomer,I,CC[C@H](C)[C@@H](C(=O)O)N,Isoleucine
+monomer,C,C([C@@H](C(=O)O)N)S,Cysteine
+monomer,Y,C1=CC(=CC=C1C[C@@H](C(=O)O)N)O,Tyrosine
+monomer,H,C1=C(NC=N1)C[C@@H](C(=O)O)N,Histidine
+monomer,R,C(C[C@@H](C(=O)O)N)CN=C(N)N,Arginine
+monomer,N,C([C@@H](C(=O)O)N)C(=O)N,Asparagine
+monomer,D,C([C@@H](C(=O)O)N)C(=O)O,Aspartic Acid
+monomer,T,C[C@H]([C@@H](C(=O)O)N)O,Threonine
+monomer,G_amd,C(C(=O)N)N,Glycine Amidation
+monomer,A_amd,C[C@@H](C(=O)N)N,Alanine Amidation
+monomer,L_amd,CC(C)C[C@@H](C(=O)N)N,Leucine Amidation
+monomer,M_amd,CSCC[C@@H](C(=O)N)N,Methionine Amidation
+monomer,F_amd,C1=CC=C(C=C1)C[C@@H](C(=O)N)N,Phenylalanine Amidation
+monomer,W_amd,C1=CC=C2C(=C1)C(=CN2)C[C@@H](C(=O)N)N,Tryptophan Amidation
+monomer,K_amd,C(CCN)C[C@@H](C(=O)N)N,Lysine Amidation
+monomer,Q_amd,C(CC(=O)N)[C@@H](C(=O)N)N,Glutamine Amidation
+monomer,E_amd,C(CC(=O)O)[C@@H](C(=O)N)N,Glutamic Acid Amidation
+monomer,S_amd,C([C@@H](C(=O)N)N)O,Serine Amidation
+monomer,P_amd,C1C[C@H](NC1)C(=O)N,Proline Amidation
+monomer,V_amd,CC(C)[C@@H](C(=O)N)N,Valine Amidation
+monomer,I_amd,CC[C@H](C)[C@@H](C(=O)N)N,Isoleucine Amidation
+monomer,C_amd,C([C@@H](C(=O)N)N)S,Cysteine Amidation
+monomer,Y_amd,C1=CC(=CC=C1C[C@@H](C(=O)N)N)O,Tyrosine Amidation
+monomer,H_amd,C1=C(NC=N1)C[C@@H](C(=O)N)N,Histidine Amidation
+monomer,R_amd,C(C[C@@H](C(=O)N)N)CN=C(N)N,Arginine Amidation
+monomer,N_amd,C([C@@H](C(=O)N)N)C(=O)N,Asparagine Amidation
+monomer,D_amd,C([C@@H](C(=O)N)N)C(=O)O,Aspartic Acid Amidation
+monomer,T_amd,C[C@H]([C@@H](C(=O)N)N)O,Threonine Amidation
+monomer,Tma,C[N+](C)(C)CCCNC(=O)C=C,
+monomer,Aeg,NC(=[NH2+])NCCNC(=O)C=C,
+monomer,Mo,C=CC(=O)N1CCOCC1,
+monomer,Mep,COCCCNC(=O)C=C,
+monomer,Ni,CC(C)NC(=O)C=C,
+monomer,Phe,C=CC(=O)Nc1ccccc1,
+monomer,Do,CCCCCCCCCCCCNC(=O)C=C,
+monomer,Bam,CCCCNC(=O)C=C,
+monomer,Oct,CCCCCCCCNC(=O)C=C,
+monomer,Olam,CCCCCCCC/C=C\CCCCCCCCNC(=O)C(=C),
+monomer,Bmam,CCCCOCNC(=O)C=C,
+monomer,Tmb,CC(C)(C)CC(C)(C)NC(=O)C=C,
+bond,Amb,CNC(C)=O,Amide bond
+bond,Cc,CC,single Carbon bond
