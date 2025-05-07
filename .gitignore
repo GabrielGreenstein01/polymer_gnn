@@ -10,3 +10,4 @@ inference_results
 inference_results.zip
 .ipynb_checkpoints/
 .ipynb_checkpoints/
+.DS_Store
