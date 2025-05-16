@@ -9,26 +9,28 @@ import torch
 
 import joblib
 
-from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
+from sklearn.preprocessing import MinMaxScaler, QuantileTransformer, StandardScaler
 
-def get_unscaled_features(SMILES, DESCRIPTORS):
+from utils.util_functions import get_unscaled_features
 
-    df_smiles = pd.read_csv(SMILES)
-    descriptors_to_keep = pd.read_json(DESCRIPTORS).to_dict(orient='records')[0]
+# def get_unscaled_features(SMILES, DESCRIPTORS):
 
-    unscaled_feats = {}
+#     df_smiles = pd.read_csv(SMILES)
+#     descriptors_to_keep = pd.read_json(DESCRIPTORS).to_dict(orient='records')[0]
+
+#     unscaled_feats = {}
     
-    for _type in df_smiles['type'].unique():
+#     for _type in df_smiles['type'].unique():
 
-        df_type = df_smiles[df_smiles['type'] == _type]
-        full_features = df_type['SMILES'].apply(
-            lambda x: Descriptors.CalcMolDescriptors(Chem.MolFromSmiles(x), missingVal=-9999, silent=True)
-        )
-        features = full_features.map(lambda x: np.array([x[key] for key in descriptors_to_keep[_type]]))
-        feats_dict = dict(zip(df_type['molecule'], features))
-        unscaled_feats[_type] = feats_dict
+#         df_type = df_smiles[df_smiles['type'] == _type]
+#         full_features = df_type['SMILES'].apply(
+#             lambda x: Descriptors.CalcMolDescriptors(Chem.MolFromSmiles(x), missingVal=-9999, silent=True)
+#         )
+#         features = full_features.map(lambda x: np.array([x[key] for key in descriptors_to_keep[_type]]))
+#         feats_dict = dict(zip(df_type['molecule'], features))
+#         unscaled_feats[_type] = feats_dict
     
-    return unscaled_feats
+#     return unscaled_feats
 
 def scale_features(scale_type, string, unscaled_feats):
     string_split = re.findall('[A-Z][^A-Z]*', string)
@@ -45,18 +47,20 @@ def scale(dataset, SMILES, DESCRIPTORS):
     
     unscaled_feats = get_unscaled_features(SMILES,DESCRIPTORS)
     
-    all_monomers = ''.join(dataset['train'].values())
-    all_bonds = ''.join(
-        (len(val) - 1) * 'Amb' if 'pep' in key else (len(val) - 1) * 'Cc'
-        for key, val in dataset['train'].items()
-    )
+    # all_monomers = ''.join(dataset['train'].values())
+    # all_bonds = ''.join(
+    #     (len(val) - 1) * 'Amb' if 'pep' in key else (len(val) - 1) * 'Cc'
+    #     for key, val in dataset['train'].items()
+    # )
 
     # MAKE SCALE_FEATURES UPDATE UNSCALED FEATURES IN CASE THERE ARE MONOMERS NOT IN TRAIN THAT APPEAR IN VAL/TEST
 
-    monomer_scaler, scaled_monomers = scale_features('monomer', all_monomers, unscaled_feats)
-    bond_scaler, scaled_bonds = scale_features('bond', all_bonds, unscaled_feats)
+    # monomer_scaler, scaled_monomers = scale_features('monomer', all_monomers, unscaled_feats)
+    # bond_scaler, scaled_bonds = scale_features('bond', all_bonds, unscaled_feats)
 
-    scalers = {'monomer': monomer_scaler, 'bond': bond_scaler}
-    scaled_feats = {'monomer': scaled_monomers, 'bond': scaled_bonds}
+    # scalers = {'monomer': monomer_scaler, 'bond': bond_scaler}
+    # scaled_feats = {'monomer': scaled_monomers, 'bond': scaled_bonds}
     
-    return scalers, scaled_feats
+    # return scalers, scaled_feats
+
+    return unscaled_feats

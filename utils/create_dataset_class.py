@@ -7,6 +7,8 @@ import torch
 
 from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 
+from utils.util_functions import seq_to_dgl
+
 class DataSet():
     def __init__(self, db_file, scaled_feats, split_dataset, LABELNAME, TASK, MODEL):
         
@@ -20,44 +22,45 @@ class DataSet():
 
         self.structure_data(scaled_feats, split_dataset)
 
-    def seq_to_dgl(self, ID, sequence, scaled_feats, model):
+    # def seq_to_dgl(self, ID, sequence, scaled_feats, model):
 
-        monomers = re.findall('[A-Z][^A-Z]*', sequence)
+    #     monomers = re.findall('[A-Z][^A-Z]*', sequence)
     
-        if 'pep' in ID:
-            bond_type = 'Amb'
-        else:
-            bond_type = 'Cc'
+    #     if 'pep' in ID:
+    #         bond_type = 'Amb'
+    #     else:
+    #         bond_type = 'Cc'
         
-        # Initialize DGL graph
-        g = dgl.graph(([], []), num_nodes=len(monomers))
+    #     # Initialize DGL graph
+    #     g = dgl.graph(([], []), num_nodes=len(monomers))
     
-        # Featurize nodes
-        node_features = [
-            torch.tensor(scaled_feats["monomer"][monomer], dtype=torch.float32)
-            for monomer in monomers
-        ]
-        g.ndata["h"] = torch.stack(node_features)
+    #     # Featurize nodes
+    #     node_features = [
+    #         torch.tensor(scaled_feats["monomer"][monomer], dtype=torch.float32)
+    #         for monomer in monomers
+    #     ]
+    #     g.ndata["h"] = torch.stack(node_features)
     
-        # Edges are between sequential monomers, i.e., (0->1, 1->2, etc.)
-        src_nodes = list(range(len(monomers) - 1))  # Start nodes of edges
-        dst_nodes = list(range(1, len(monomers)))  # End nodes of edges
-        g.add_edges(src_nodes, dst_nodes)
+    #     # Edges are between sequential monomers, i.e., (0->1, 1->2, etc.)
+    #     src_nodes = list(range(len(monomers) - 1))  # Start nodes of edges
+    #     dst_nodes = list(range(1, len(monomers)))  # End nodes of edges
+    #     g.add_edges(src_nodes, dst_nodes)
     
-        # Featurize edges
-        edge_features = [
-            torch.tensor(scaled_feats["bond"][bond_type], dtype=torch.float32)
-        ] * g.number_of_edges()
-        g.edata["e"] = torch.stack(edge_features)
+    #     # Featurize edges
+    #     edge_features = [
+    #         torch.tensor(scaled_feats["bond"][bond_type], dtype=torch.float32)
+    #     ] * g.number_of_edges()
+    #     g.edata["e"] = torch.stack(edge_features)
     
-        if model == "GCN" or model == "GAT":
-            g = dgl.add_self_loop(g)
+    #     if model == "GCN" or model == "GAT":
+    #         g = dgl.add_self_loop(g)
     
-        return g
+    #     return g
     
     def structure_data(self, scaled_feats, split_dataset):
 
-        self._df['dgl'] = self._df.apply(lambda row: self.seq_to_dgl(row['ID'], row['sequence'], scaled_feats, self._model),axis=1)
+        # self._df['dgl'] = self._df.apply(lambda row: self.seq_to_dgl(row['ID'], row['sequence'], scaled_feats, self._model),axis=1)
+        self._df['dgl'] = self._df.apply(lambda row: seq_to_dgl(row['ID'], row['sequence'], scaled_feats, self._model),axis=1)
 
         #### SCALE ALL SETS AT ONCE!!!
         # self.scaler = MinMaxScaler(feature_range=(0, 1))

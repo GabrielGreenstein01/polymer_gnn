@@ -1,15 +1,18 @@
 {
   "model": "MPNN",
-  "n_tasks": 1,
+  "n_tasks": 3,
   "in_node_feats": 104,
   "in_edge_feats": 79,
-  "lr": 0.0019990174930925256,
-  "weight_decay": 1.6472211157416202e-05,
-  "patience": 15,
+  "lr": 0.00503747128526906,
+  "weight_decay": 1.1279287174657636e-06,
+  "patience": 30,
   "batch_size": 256,
   "node_out_feats": 64,
   "edge_hidden_feats": 128,
   "num_step_message_passing": 6,
   "num_step_set2set": 3,
-  "num_layer_set2set": 3
+  "num_layer_set2set": 3,
+  "wt1": 0.6489265326546706,
+  "wt2": 0.5271293335916668,
+  "wt3": 0.648557204553638
 }

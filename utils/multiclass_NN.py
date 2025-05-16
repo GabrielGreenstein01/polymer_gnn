@@ -94,14 +94,14 @@ class multiclass_NN():
                 self._loss_criterion = nn.BCEWithLogitsLoss(reduction='none')
             if self._dataset._ntask > 1:
 
-                if all(key in self._custom_params for key in ('wt1', 'wt2', 'wt3')):
-                    weights = torch.tensor([self._custom_params['wt1'], self._custom_params['wt2'], self._custom_params['wt3']], dtype=torch.float)
-                else:
-                    weights = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float)
+                # if all(key in self._custom_params for key in ('wt1', 'wt2', 'wt3')):
+                #     weights = torch.tensor([self._custom_params['wt1'], self._custom_params['wt2'], self._custom_params['wt3']], dtype=torch.float)
+                # else:
+                #     weights = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float)
                     
-                weights = weights.to(self._device)
-                self._loss_criterion = nn.CrossEntropyLoss(weight=weights)
-                # self._loss_criterion = nn.CrossEntropyLoss()
+                # weights = weights.to(self._device)
+                # self._loss_criterion = nn.CrossEntropyLoss(weight=weights)
+                self._loss_criterion = nn.CrossEntropyLoss()
             
         self._config_update()
         if self._model_path != None:
