@@ -300,15 +300,15 @@ class multiclass_NN():
         data = sum([[dataset, epoch+1], list(metrics.values()), [eval_end_time - eval_start_time]], [])
         self._log.append(data)
 
-        IDs, mask, y_pred, y_true = eval_meter._finalize()
+        IDs, mask, logits, y_true = eval_meter._finalize()
 
         mask = mask.ravel().long()
-        y_probs = y_pred.softmax(dim=1)
-        y_pred = y_pred.argmax(dim=1).long()
+        y_probs = logits.softmax(dim=1)
+        y_pred = logits.argmax(dim=1).long()
         y_true = y_true.ravel().long()
                         
         return metrics, [IDs, mask, y_probs, y_pred, y_true]
-        
+
     def _predict(self, model, bg):
         ''' Utility function for moving batched graph and node/edge feats to device
         
@@ -379,25 +379,29 @@ class multiclass_NN():
         
         self.model = model
 
-        self.rocauc_plot(test_score[1])
-        # self.prauc_plot(test_score[1])
-        self.cm_plot(test_score[0]['confusion_matrix'])
+        results_df = self.export_results(test_score[1])
         
-        self.export_results(test_score[1])
+        self.cm_plot(results_df)
+        self.rocauc_plot(results_df)
+        self.prauc_plot(results_df)
 
+        # if n_tasks =1: return -test_score[0]['roc_auc_avg']; else
         return -test_score[0]['0vr_roc_auc']
     
     def export_results(self, data):
         
-        IDs, mask, _, y_pred, y_true = data
+        IDs, mask, y_probs, y_pred, y_true = data
 
         df = pd.DataFrame({'ID': IDs,
+                           'y_probs': y_probs.tolist(),
                            'y_pred': y_pred.tolist(),
                            'y_true': y_true.tolist(),
                             'mask': mask.tolist()
                           })
 
         df.to_csv(self._model_path + '/results.txt', index=False)
+
+        return df
         
     def plot_loss(self, df):
 
@@ -420,15 +424,58 @@ class multiclass_NN():
         plt.savefig(self._model_path + '/loss_fig.png')
         plt.close()
 
-    def cm_plot(self, data):
-        disp = ConfusionMatrixDisplay(confusion_matrix=data)
+    def cm_plot(self, df):
+
+        if self._dataset._task == 1:
+            lbs = [0,1]
+        else:
+            lbs = [ i for i in range(self._dataset._task)]
+
+        if self.__dataset._mixed == True:
+            data1 = confusion_matrix(df['y_true'].to_numpy(), df['y_pred'].to_numpy(), labels=lbs)
+            disp = ConfusionMatrixDisplay(confusion_matrix=data1)
+            disp.plot()
+            plt.savefig(self._model_path + '/CM_all.png')
+            plt.close()
+
+        polymers = df[df["ID"].str.contains("poly", na=False)].copy()
+
+        # split once
+        split_ID = polymers["ID"].str.split("_S", n=1, expand=True)
+        
+        # assign back
+        polymers["ID"]     = split_ID[0]
+        polymers["sample"] = split_ID[1].astype(int)
+        data2 = confusion_matrix(polymers['y_true'].to_numpy(), polymers['y_pred'].to_numpy(), labels=lbs)
+
+        disp = ConfusionMatrixDisplay(confusion_matrix=data2)
         disp.plot()
-        plt.savefig(self._model_path + '/CM.png')
+        plt.savefig(self._model_path + '/CM_all_poly.png')
+        plt.close()
+
+        grouped = (polymers
+                   .groupby("ID", sort=False) # group on ID, keep first-seen order
+                   .mean(numeric_only=True) # take the mean of all numeric columns
+                   .reset_index()           # turn ID back into a column
+                  )
+        
+        grouped = grouped.drop(columns="sample")
+        
+        # convert them all to int
+        num_cols = grouped.select_dtypes(include="number").columns
+        grouped[num_cols] = grouped[num_cols].round().astype(int)
+        
+        data3 = confusion_matrix(grouped['y_true'].to_numpy(), grouped['y_pred'].to_numpy(), labels=lbs)
+
+        disp = ConfusionMatrixDisplay(confusion_matrix=data3)
+        disp.plot()
+
+        plt.savefig(self._model_path + '/CM_poly_avg.png')
         plt.close()
 
         return
 
-    def rocauc_plot(self, plotdata):
+    def rocauc_plot(self, df):
         ''' Plots ROC-AUC curve for classification task
         
         Args:
@@ -436,73 +483,120 @@ class multiclass_NN():
         fig_path : str, path to save figure
         '''
 
-        _, _, y_probs, y_pred, y_true = plotdata
-
+        probs = np.vstack(df['y_probs'].values)    # shape (n_samples, n_classes)
+        truth = np.array(df['y_true'].tolist())    # shape (n_samples,)
+        
         plt.figure()
-
-        n_classes = y_probs.shape[1]
+        n_classes = probs.shape[1]
         
         for i in range(n_classes):
-            # Create a binary label: 1 if the true label is i, else 0
-            binary_targets = (y_true.numpy() == i).astype(int)
-            
-            # The probability of class i for each sample
-            probs_class_i = y_probs.numpy()[:, i]
-            
-            try:
-                mean_fpr, mean_tpr, _ = roc_curve(binary_targets, probs_class_i)
-                mean_tpr[-1] = 1.0
-                mean_auc = auc(mean_fpr, mean_tpr)
-
-                lw = 2
-                plt.plot(mean_fpr, mean_tpr,lw=lw, label='OVR Class ' + str(i) + ' ( ' + str(np.around(mean_auc, 3)) + ' )')
-
-            except ValueError as e:
-                roc_auc = None  # In case there is only one class present in binary_targets
-
-        plt.plot([0, 1], [0, 1], color='#B2B2B2', lw=lw, linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate', fontsize=18)
-        plt.ylabel('True Positive Rate', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.legend(loc="lower right")
+            # one-vs-rest truth vector
+            bin_truth = (truth == i).astype(int)
+            class_probs = probs[:, i]
         
+            # skip if y_true never equals this class in your data
+            if len(np.unique(bin_truth)) < 2:
+                continue
+        
+            fpr, tpr, _ = roc_curve(bin_truth, class_probs)
+            roc_auc    = auc(fpr, tpr)
+            plt.plot(fpr, tpr,
+                     lw=2,
+                     label=f"OVR Class {i} (AUC = {roc_auc:.3f})")
+        
+        # plot the chance diagonal
+        plt.plot([0, 1], [0, 1],
+                 linestyle="--",
+                 lw=2,
+                 color="#B2B2B2")
+        
+        plt.xlim(0, 1)
+        plt.ylim(0, 1.05)
+        plt.xlabel("False Positive Rate", fontsize=14)
+        plt.ylabel("True Positive Rate",  fontsize=14)
+        plt.title("ROC Curves (One-vs-Rest)",    fontsize=16)
+        plt.tick_params(labelsize=12)
+        plt.legend(loc="lower right", fontsize=12)
         plt.tight_layout()
-        plt.savefig(self._model_path + '/ROC_AUC.png')
+        plt.savefig(self._model_path + "/ROC_AUC.png")
         plt.close()
+
+        # y_probs = df['y_prob']
+        # y_pred = df['y_pred']
+        # y_true = df['y_true']
+
+        # plt.figure()
+
+        # n_classes = y_probs.shape[1]
+
+        # for i in range(n_classes):
+        #     # Create a binary label: 1 if the true label is i, else 0
+        #     binary_targets = (y_true.numpy() == i).astype(int)
+            
+        #     # The probability of class i for each sample
+        #     probs_class_i = y_probs.numpy()[:, i]
+            
+        #     try:
+        #         mean_fpr, mean_tpr, _ = roc_curve(binary_targets, probs_class_i)
+        #         mean_tpr[-1] = 1.0
+        #         mean_auc = auc(mean_fpr, mean_tpr)
+
+        #         lw = 2
+        #         plt.plot(mean_fpr, mean_tpr,lw=lw, label='OVR Class ' + str(i) + ' ( ' + str(np.around(mean_auc, 3)) + ' )')
+
+        #     except ValueError as e:
+        #         roc_auc = None  # In case there is only one class present in binary_targets
+
+        # plt.plot([0, 1], [0, 1], color='#B2B2B2', lw=lw, linestyle='--')
+        # plt.xlim([0.0, 1.0])
+        # plt.ylim([0.0, 1.05])
+        # plt.xlabel('False Positive Rate', fontsize=18)
+        # plt.ylabel('True Positive Rate', fontsize=18)
+        # plt.tick_params(axis='both', which='major', labelsize=16)
+        # plt.legend(loc="lower right")
+        
+        # plt.tight_layout()
+        # plt.savefig(self._model_path + '/ROC_AUC.png')
+        # plt.close()
 
         return
 
-    # def prauc_plot(self, plotdata):
+    def prauc_plot(self, df):
+    
+        # stack the per-sample probability lists into an (N × C) array
+        y_probs = np.vstack(df['y_probs'].values)
+        y_true  = np.array(df['y_true'].tolist())
+    
+        n_classes = y_probs.shape[1]
+        plt.figure()
+    
+        for i in range(n_classes):
+            # binarize: 1 for class i, else 0
+            binary_targets = (y_true == i).astype(int)
+    
+            # skip if only one class present
+            if len(np.unique(binary_targets)) < 2:
+                continue
+    
+            probs_i = y_probs[:, i]
+            precision, recall, _ = precision_recall_curve(binary_targets, probs_i)
+            ap = average_precision_score(binary_targets, probs_i)
+    
+            plt.plot(
+                recall, precision,
+                lw=2,
+                label=f'OVR Class {i} (AP={ap:.3f})'
+            )
+    
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('Recall', fontsize=14)
+        plt.ylabel('Precision', fontsize=14)
+        plt.title('One-vs-Rest Precision-Recall Curves', fontsize=16)
+        plt.legend(loc="lower right", fontsize=12)
+        plt.tight_layout()
+        plt.savefig(f"{save_path}/PR_Curve.png")
+        plt.close()
         
-    #     _, _, y_pred, y_true = plotdata
-
-    #     # Compute precision-recall curve
-    #     precision, recall, _ = precision_recall_curve(y_true, y_pred)
-        
-    #     # Compute the average precision score (area under the precision-recall curve)
-    #     average_precision = average_precision_score(y_true, y_pred)
-        
-    #     # Plot Precision-Recall curve
-    #     plt.figure()
-    #     lw = 2
-    #     plt.plot(recall, precision, color='#2C7FFF', lw=lw, label='Precision-Recall curve')
-    #     plt.xlim([0.0, 1.0])
-    #     plt.ylim([0.0, 1.05])
-    #     plt.xlabel('Recall', fontsize=18)
-    #     plt.ylabel('Precision', fontsize=18)
-    #     plt.tick_params(axis='both', which='major', labelsize=16)
-    #     plt.text(0.95, 0.03, 'Avg Precision = %0.2f' % (average_precision),
-    #              verticalalignment='bottom', horizontalalignment='right',
-    #              fontsize=18)
-        
-
-    #     plt.axhline(y=0.5, color='#B2B2B2', lw=lw, linestyle='--')
-
-    #     plt.tight_layout()
-    #     plt.savefig(self._model_path + '/PR_Curve.png')
-    #     plt.close()
-
-    #     return
+        return
     

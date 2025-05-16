@@ -20,23 +20,23 @@ class Meter_v2():
         '''
         self.IDs = []
         self._mask = []
-        self.y_pred = []
+        self.logits = []
         self.y_true = []
 
 
-    def update(self, IDs, y_pred, y_true, mask=None):
+    def update(self, IDs, logits, y_true, mask=None):
         '''Updates for the result of an iteration
 
         Args:
-        y_pred : float32 tensor, predicted labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
+        logits : float32 tensor, predicted labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
         y_true : float32 tensor, ground truth labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
         mask : None or float32 tensor, binary mask indicating the existence of ground truth labels
         '''
         self.IDs.append(IDs)
-        self.y_pred.append(y_pred.detach().cpu())
+        self.logits.append(logits.detach().cpu())
         self.y_true.append(y_true.detach().cpu())
         if mask is None:
-            self._mask.append(torch.ones(self.y_pred[-1].shape))
+            self._mask.append(torch.ones(self.logits[-1].shape))
         else:
             self._mask.append(mask.detach().cpu())
     
@@ -45,23 +45,23 @@ class Meter_v2():
 
         Returns:
         mask : float32 tensor, binary mask indicating the existence of ground truth labels
-        y_pred : float32 tensor, predicted labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
+        logits : float32 tensor, predicted labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
         y_true : float32 tensor, ground truth labels with shape (B, T), B for number of graphs in the batch and T for number of tasks
         '''
         IDs = sum(self.IDs, [])
         mask = torch.cat(self._mask, dim=0)
-        y_pred = torch.cat(self.y_pred, dim=0)
+        logits = torch.cat(self.logits, dim=0)
         y_true = torch.cat(self.y_true, dim=0)
 
-        return IDs, mask, y_pred, y_true
+        return IDs, mask, logits, y_true
 
     def compute_metrics(self, loss):
 
-        _, mask, y_pred, y_true = self._finalize()
+        _, mask, logits, y_true = self._finalize()
         
         all_targets = y_true.ravel().long()
-        all_preds = y_pred.argmax(dim=1).long()
-        all_probs = y_pred.softmax(dim=1)
+        all_preds = logits.argmax(dim=1).long()
+        all_probs = logits.softmax(dim=1)
 
         metrics = { 'loss': np.mean(loss),
                     'ROC-AUC': roc_auc_score(all_targets, all_probs, multi_class='ovr'),

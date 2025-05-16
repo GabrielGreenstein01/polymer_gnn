@@ -10,64 +10,25 @@ from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from utils.util_functions import seq_to_dgl
 
 class DataSet():
-    def __init__(self, db_file, scaled_feats, split_dataset, LABELNAME, TASK, MODEL):
+    def __init__(self, db_file, features, split_dataset, LABELNAME, TASK, MODEL):
         
         self._labelname = LABELNAME
         self._model = MODEL
         self._task = TASK
+        
+        self._mixed = split_dataset['mixed']
+        del split_dataset['mixed']
 
         self._df = pd.read_csv(db_file)
 
-        self._data = {}
-
-        self.structure_data(scaled_feats, split_dataset)
-
-    # def seq_to_dgl(self, ID, sequence, scaled_feats, model):
-
-    #     monomers = re.findall('[A-Z][^A-Z]*', sequence)
-    
-    #     if 'pep' in ID:
-    #         bond_type = 'Amb'
-    #     else:
-    #         bond_type = 'Cc'
+        self._features = features
         
-    #     # Initialize DGL graph
-    #     g = dgl.graph(([], []), num_nodes=len(monomers))
-    
-    #     # Featurize nodes
-    #     node_features = [
-    #         torch.tensor(scaled_feats["monomer"][monomer], dtype=torch.float32)
-    #         for monomer in monomers
-    #     ]
-    #     g.ndata["h"] = torch.stack(node_features)
-    
-    #     # Edges are between sequential monomers, i.e., (0->1, 1->2, etc.)
-    #     src_nodes = list(range(len(monomers) - 1))  # Start nodes of edges
-    #     dst_nodes = list(range(1, len(monomers)))  # End nodes of edges
-    #     g.add_edges(src_nodes, dst_nodes)
-    
-    #     # Featurize edges
-    #     edge_features = [
-    #         torch.tensor(scaled_feats["bond"][bond_type], dtype=torch.float32)
-    #     ] * g.number_of_edges()
-    #     g.edata["e"] = torch.stack(edge_features)
-    
-    #     if model == "GCN" or model == "GAT":
-    #         g = dgl.add_self_loop(g)
-    
-    #     return g
-    
-    def structure_data(self, scaled_feats, split_dataset):
+        self._data = {}
+        self.structure_data(split_dataset)
 
-        # self._df['dgl'] = self._df.apply(lambda row: self.seq_to_dgl(row['ID'], row['sequence'], scaled_feats, self._model),axis=1)
-        self._df['dgl'] = self._df.apply(lambda row: seq_to_dgl(row['ID'], row['sequence'], scaled_feats, self._model),axis=1)
+    def structure_data(self, split_dataset):
 
-        #### SCALE ALL SETS AT ONCE!!!
-        # self.scaler = MinMaxScaler(feature_range=(0, 1))
-        # self.scaler = QuantileTransformer(output_distribution='normal', n_quantiles=len(labels.unique()))
-        # self.scaler = FunctionTransformer(lambda x: x)
-        # self._df['scaled_labels'] = self.scaler.fit_transform(self._df[self._labelname].to_frame()).flatten()
-
+        self._df['dgl'] = self._df.apply(lambda row: seq_to_dgl(row['ID'], row['sequence'], self._features, self._model),axis=1)
         num_labels = len(self._df[self._labelname].unique())
         
         if self._task == 'classification':
@@ -81,7 +42,6 @@ class DataSet():
             IDs = list(split_dataset[_set].keys())
             
             dgl_graphs = self._df.set_index('ID').loc[IDs, 'dgl'].reset_index(drop=True)
-            # labels = self._df.set_index('ID').loc[IDs, 'scaled_labels'].reset_index(drop=True)
             labels = self._df.set_index('ID').loc[IDs, self._labelname].reset_index(drop=True)
 
             masks = pd.isnull(labels)

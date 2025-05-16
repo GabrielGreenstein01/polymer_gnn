@@ -86,8 +86,9 @@ def split(db_file, SEED, SPLIT_RATIO, MIXED = True):
         test_end_idx = get_idx(df_shuffled, test_start_idx, test_set_len) + 1
         test_set = df_shuffled.iloc[test_start_idx:test_end_idx,:]
 
-    return  {'train': train_set.set_index('ID')['sequence'].to_dict(),
-             'val': val_set.set_index('ID')['sequence'].to_dict(),
+    return  {'mixed': MIXED, 
+             'train': train_set.set_index('ID')['sequence'].to_dict(), 
+             'val': val_set.set_index('ID')['sequence'].to_dict(), 
              'test': test_set.set_index('ID')['sequence'].to_dict()}
     
     

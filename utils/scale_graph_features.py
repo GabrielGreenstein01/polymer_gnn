@@ -13,25 +13,6 @@ from sklearn.preprocessing import MinMaxScaler, QuantileTransformer, StandardSca
 
 from utils.util_functions import get_unscaled_features
 
-# def get_unscaled_features(SMILES, DESCRIPTORS):
-
-#     df_smiles = pd.read_csv(SMILES)
-#     descriptors_to_keep = pd.read_json(DESCRIPTORS).to_dict(orient='records')[0]
-
-#     unscaled_feats = {}
-    
-#     for _type in df_smiles['type'].unique():
-
-#         df_type = df_smiles[df_smiles['type'] == _type]
-#         full_features = df_type['SMILES'].apply(
-#             lambda x: Descriptors.CalcMolDescriptors(Chem.MolFromSmiles(x), missingVal=-9999, silent=True)
-#         )
-#         features = full_features.map(lambda x: np.array([x[key] for key in descriptors_to_keep[_type]]))
-#         feats_dict = dict(zip(df_type['molecule'], features))
-#         unscaled_feats[_type] = feats_dict
-    
-#     return unscaled_feats
-
 def scale_features(scale_type, string, unscaled_feats):
     string_split = re.findall('[A-Z][^A-Z]*', string)
     features = [unscaled_feats[scale_type][mon] for mon in string_split]
