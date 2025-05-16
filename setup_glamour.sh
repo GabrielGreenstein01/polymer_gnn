@@ -55,7 +55,7 @@ if [ -f ~/.bashrc_executed ]; then
   pip install numpy==1.23.0
 
   # Clone the GitHub repository
-  git clone git@github.com:GabrielGreenstein01/polymer_gnn.git
+  git clone https://github.com/GabrielGreenstein01/polymer_gnn.git
 
   # Source the updated bashrc again to make conda available immediately
   source ~/.bashrc

@@ -93,14 +93,6 @@ class multiclass_NN():
             if self._dataset._ntask == 1:
                 self._loss_criterion = nn.BCEWithLogitsLoss(reduction='none')
             if self._dataset._ntask > 1:
-
-                # if all(key in self._custom_params for key in ('wt1', 'wt2', 'wt3')):
-                #     weights = torch.tensor([self._custom_params['wt1'], self._custom_params['wt2'], self._custom_params['wt3']], dtype=torch.float)
-                # else:
-                #     weights = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float)
-                    
-                # weights = weights.to(self._device)
-                # self._loss_criterion = nn.CrossEntropyLoss(weight=weights)
                 self._loss_criterion = nn.CrossEntropyLoss()
             
         self._config_update()
@@ -251,7 +243,11 @@ class multiclass_NN():
             IDs, bg, labels, masks = batch_data
             labels, masks = labels.to(self._device), masks.to(self._device)
             logits = self._predict(model, bg)
-            losslabels = labels.squeeze(dim=1).long()
+
+            if self._dataset._ntask == 1:
+                losslabels = labels
+            else:
+                losslabels = labels.squeeze(dim=1).long()
 
             loss = (self._loss_criterion(logits, losslabels) * (masks != 0).float()).mean()
 
@@ -289,7 +285,10 @@ class multiclass_NN():
                 logits = self._predict(model, bg)
                 eval_meter.update(IDs, logits, labels, masks)
 
-                losslabels = labels.squeeze(dim=1).long()
+                if self._dataset._ntask == 1:
+                    losslabels = labels
+                else:
+                    losslabels = labels.squeeze(dim=1).long()
                 
                 loss = (self._loss_criterion(logits, losslabels) * (masks != 0).float()).mean()
                 loss_list.append(loss.item())
@@ -426,12 +425,12 @@ class multiclass_NN():
 
     def cm_plot(self, df):
 
-        if self._dataset._task == 1:
+        if self._dataset._ntask == 1:
             lbs = [0,1]
         else:
-            lbs = [ i for i in range(self._dataset._task)]
+            lbs = [ i for i in range(int(self._dataset._ntask))]
 
-        if self.__dataset._mixed == True:
+        if self._dataset._mixed == True:
             data1 = confusion_matrix(df['y_true'].to_numpy(), df['y_pred'].to_numpy(), labels=lbs)
             disp = ConfusionMatrixDisplay(confusion_matrix=data1)
             disp.plot()
@@ -595,7 +594,7 @@ class multiclass_NN():
         plt.title('One-vs-Rest Precision-Recall Curves', fontsize=16)
         plt.legend(loc="lower right", fontsize=12)
         plt.tight_layout()
-        plt.savefig(f"{save_path}/PR_Curve.png")
+        plt.savefig(self._model_path + "/PR_Curve.png")
         plt.close()
         
         return

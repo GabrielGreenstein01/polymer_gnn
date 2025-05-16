@@ -24,11 +24,11 @@ class HyperparameterOptimization:
     def __init__(self, seed, GPU, model, num_epochs, num_trials):
         # Generic parameters
         os.environ['CUDA_VISIBLE_DEVICES'] = str(GPU)
-        self.DESCRIPTORS = 'feature_engineering/unique_descriptors.json'
+        self.DESCRIPTORS = 'monomer_data/unique_descriptors.json'
         self.SEED = seed
         self.TASK = 'classification'
         self.MODEL = model
-        self.LABELNAME = '3_classes'
+        self.LABELNAME = 'binary_class'
         self.NUM_EPOCHS = num_epochs
         self.NUM_WORKERS = os.cpu_count()
         self.MODEL_PATH = './past_trials/' + model + '/hyperparameter_optimization'
@@ -39,19 +39,16 @@ class HyperparameterOptimization:
 
         # Train/validation dataset setup
         self.db_file = 'data_preprocessing/db.csv'
-        self.SPLIT_RATIO = '0.4,0.3,0.3' # Train, Val, Test
+        # self.SPLIT_RATIO = '0.4,0.3,0.3' # Train, Val, Test
+        self.SPLIT_RATIO = '0.7,0.3' # Train, Val, Test
+        self.MIXED = False
         self.SMILES = 'data_preprocessing/SMILES.txt'
 
-        split_db = split(self.db_file, self.SEED, self.SPLIT_RATIO)
+        split_db = split(self.db_file, self.SEED, self.SPLIT_RATIO, self.MIXED)
 
-        self.scalers, scaled_feats = scale(split_db, self.SMILES, self.DESCRIPTORS)
+        self.features = scale(split_db, self.SMILES, self.DESCRIPTORS)
 
-        # Fix features for bonds
-        for bond_type in scaled_feats['bond'].keys():
-            num_features = len(scaled_feats['bond'][bond_type])
-            scaled_feats['bond'][bond_type] = np.zeros(num_features)
-
-        self.dataset = DataSet(self.db_file, scaled_feats, split_db, self.LABELNAME, self.TASK, self.MODEL)
+        self.dataset = DataSet(self.db_file, self.features, split_db, self.LABELNAME, self.TASK, self.MODEL)
 
     def objective(self, trial):
         # The parameters are automatically suggested based on the search space
@@ -104,7 +101,6 @@ class HyperparameterOptimization:
 
         # Create the directory if it doesn't exist
         os.makedirs(db_directory, exist_ok=True)
-        joblib.dump(self.scalers, db_directory + '/scalers.pkl')
 
         # Create a study object with the SQLite storage
         study = optuna.create_study(
