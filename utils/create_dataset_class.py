@@ -28,7 +28,7 @@ class DataSet():
 
     def structure_data(self, split_dataset):
 
-        self._df['dgl'] = self._df.apply(lambda row: seq_to_dgl(row['ID'], row['sequence'], self._features, self._model),axis=1)
+        self._df['dgl'] = self._df.apply(lambda row: seq_to_dgl(row['ID'], row['sequence'], self._features, self._model), axis=1)
         num_labels = len(self._df[self._labelname].unique())
         
         if self._task == 'classification':

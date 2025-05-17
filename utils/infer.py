@@ -3,12 +3,11 @@ import torch
 import dgl
 import json
 import re
+import joblib
 
 from torch.utils.data import DataLoader
 
-# from utils.scale_graph_features import get_unscaled_features
-from utils.util_functions import seq_to_dgl, get_unscaled_features
-
+from utils.util_functions import seq_to_dgl
 
 class infer:
     def __init__(self, DF, GPU, NUM_WORKERS, MODEL, MODEL_PATH, SMILES, DESCRIPTORS):
@@ -21,11 +20,12 @@ class infer:
 
         self._smiles = SMILES
         self._descriptors = DESCRIPTORS
-        self._unscaled_feats = get_unscaled_features(self._smiles, self._descriptors)
+        self._features = joblib.load(MODEL_PATH + "features.pkl")
 
         self._df = DF
+
         self._df['dgl'] = self._df.apply(lambda row: 
-                                           seq_to_dgl(row['ID'], row['sequence'], self._unscaled_feats, self._model),
+                                           seq_to_dgl(row['ID'], row['sequence'], self._features, self._model),
                                            axis=1)
 
         if torch.cuda.is_available():
@@ -45,36 +45,6 @@ class infer:
             )
 
         self.model = model.to(self._device)
-
-    # def _seq_to_dgl(self, sequence):
-    #     monomers = re.findall(r"[A-Z][a-z]+", sequence)
-    
-    #     # Initialize DGL graph
-    #     g = dgl.graph(([], []), num_nodes=len(monomers))
-    
-    #     # Featurize nodes
-    #     node_features = [
-    #         torch.tensor(self._unscaled_feats["monomer"]
-    #                      [monomer], dtype=torch.float32)
-    #         for monomer in monomers
-    #     ]
-    #     g.ndata["h"] = torch.stack(node_features)
-    
-    #     # Edges are between sequential monomers, i.e., (0->1, 1->2, etc.)
-    #     src_nodes = list(range(len(monomers) - 1))  # Start nodes of edges
-    #     dst_nodes = list(range(1, len(monomers)))  # End nodes of edges
-    #     g.add_edges(src_nodes, dst_nodes)
-    
-    #     # Featurize edges
-    #     edge_features = [
-    #         torch.tensor(self._unscaled_feats["bond"]["Cc"], dtype=torch.float32)
-    #     ] * g.number_of_edges()
-    #     g.edata["e"] = torch.stack(edge_features)
-    
-    #     if self._model == "GCN" or self._model == "GAT":
-    #         g = dgl.add_self_loop(g)
-    
-    #     return g
 
     def _run_an_eval_epoch(self, model, data_loader):
         """Utility function for running an evaluation (validation/test) epoch

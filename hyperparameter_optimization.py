@@ -46,7 +46,8 @@ class HyperparameterOptimization:
 
         split_db = split(self.db_file, self.SEED, self.SPLIT_RATIO, self.MIXED)
 
-        self.features = scale(split_db, self.SMILES, self.DESCRIPTORS)
+        ### CHANGE TO SCALED_features
+        self.features = scale(split_db['train'], self.SMILES, self.DESCRIPTORS)
 
         self.dataset = DataSet(self.db_file, self.features, split_db, self.LABELNAME, self.TASK, self.MODEL)
 
@@ -101,6 +102,9 @@ class HyperparameterOptimization:
 
         # Create the directory if it doesn't exist
         os.makedirs(db_directory, exist_ok=True)
+
+        ### DUMP CORRECT FEATURES
+        joblib.dump(self.features, db_directory + '/features.pkl')
 
         # Create a study object with the SQLite storage
         study = optuna.create_study(
