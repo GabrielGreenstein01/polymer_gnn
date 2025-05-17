@@ -401,6 +401,8 @@ class multiclass_NN():
         df.to_csv(self._model_path + '/results.txt', index=False)
 
         return df
+    
+    ### MAKE SEPARATE FILE FOR PLOTS
         
     def plot_loss(self, df):
 
@@ -519,45 +521,7 @@ class multiclass_NN():
         plt.tight_layout()
         plt.savefig(self._model_path + "/ROC_AUC.png")
         plt.close()
-
-        # y_probs = df['y_prob']
-        # y_pred = df['y_pred']
-        # y_true = df['y_true']
-
-        # plt.figure()
-
-        # n_classes = y_probs.shape[1]
-
-        # for i in range(n_classes):
-        #     # Create a binary label: 1 if the true label is i, else 0
-        #     binary_targets = (y_true.numpy() == i).astype(int)
-            
-        #     # The probability of class i for each sample
-        #     probs_class_i = y_probs.numpy()[:, i]
-            
-        #     try:
-        #         mean_fpr, mean_tpr, _ = roc_curve(binary_targets, probs_class_i)
-        #         mean_tpr[-1] = 1.0
-        #         mean_auc = auc(mean_fpr, mean_tpr)
-
-        #         lw = 2
-        #         plt.plot(mean_fpr, mean_tpr,lw=lw, label='OVR Class ' + str(i) + ' ( ' + str(np.around(mean_auc, 3)) + ' )')
-
-        #     except ValueError as e:
-        #         roc_auc = None  # In case there is only one class present in binary_targets
-
-        # plt.plot([0, 1], [0, 1], color='#B2B2B2', lw=lw, linestyle='--')
-        # plt.xlim([0.0, 1.0])
-        # plt.ylim([0.0, 1.05])
-        # plt.xlabel('False Positive Rate', fontsize=18)
-        # plt.ylabel('True Positive Rate', fontsize=18)
-        # plt.tick_params(axis='both', which='major', labelsize=16)
-        # plt.legend(loc="lower right")
-        
-        # plt.tight_layout()
-        # plt.savefig(self._model_path + '/ROC_AUC.png')
-        # plt.close()
-
+ 
         return
 
     def prauc_plot(self, df):
