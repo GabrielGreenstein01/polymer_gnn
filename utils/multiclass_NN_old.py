@@ -23,7 +23,9 @@ rcParams['font.sans-serif'] = ['Arial']
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
-from sklearn.metrics import roc_curve, auc, ConfusionMatrixDisplay, precision_recall_curve, average_precision_score, confusion_matrix
+from sklearn.metrics import roc_curve, auc, ConfusionMatrixDisplay, precision_recall_curve, average_precision_score
+from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score, accuracy_score, confusion_matrix
+
 
 from dgllife.utils import RandomSplitter
 
@@ -74,18 +76,24 @@ class multiclass_NN():
         self._save_opt = SAVE_OPT
         self._save_config = SAVE_CONFIG
 
-        # self._log = [['dataset', 'epoch', 'rmse', 'L1loss', 'r2', 'mae', 'spearmanr', 'kendalltau','time']]
-        self._log = [['dataset', 'epoch', 'loss', 'roc_auc', 'f1', 'recall', 'precision', 'accuracy', 'confusion_matrix', 'time']]
+        self._log = [['dataset', 'epoch', 'loss', 'roc_auc_avg', 'f1', 'recall', 'precision', 'accuracy', 'confusion_matrix']]
 
+        # 1-v-rest ROC-AUC to log
+        for i in range(self._dataset._ntask):
+            self._log[0].append(str(i) + 'vr_roc_auc')
+
+        self._log[0].append('time')
 
         if torch.cuda.is_available():
             self._device = torch.device('cuda')
         else:
             self._device = torch.device('cpu')
 
-        # self._loss_criterion = nn.MSELoss(reduction='none') # for regression
-        # self._loss_criterion = nn.SmoothL1Loss(reduction='none') # for regression
-        self._loss_criterion = nn.BCEWithLogitsLoss(reduction='none') # for classification
+        if self._dataset._task == 'classification':
+            if self._dataset._ntask == 1:
+                self._loss_criterion = nn.BCEWithLogitsLoss(reduction='none')
+            if self._dataset._ntask > 1:
+                self._loss_criterion = nn.CrossEntropyLoss()
             
         self._config_update()
         if self._model_path != None:
@@ -97,7 +105,7 @@ class multiclass_NN():
         ''' Utility function for update of configuration dictionary '''
         self._exp_config = {}
         self._exp_config['model'] = self._model_name
-        self._exp_config['n_tasks'] = 1 # for multilabel = len(labels)
+        self._exp_config['n_tasks'] = self._dataset._ntask
             
         self._exp_config['in_node_feats'] = self._num_node_descriptors
         self._exp_config['in_edge_feats'] = self._num_edge_descriptors
@@ -236,9 +244,13 @@ class multiclass_NN():
             labels, masks = labels.to(self._device), masks.to(self._device)
             logits = self._predict(model, bg)
 
-            losslabels = labels
+            if self._dataset._ntask == 1:
+                losslabels = labels
+            else:
+                losslabels = labels.squeeze(dim=1).long()
+
             loss = (self._loss_criterion(logits, losslabels) * (masks != 0).float()).mean()
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -246,14 +258,10 @@ class multiclass_NN():
             loss_list.append(loss.item())
 
         epoch_end_time = datetime.now()
-     
-        # self._log.append(['train', epoch+1, np.mean(train_meter.compute_metric('rmse')), np.mean(loss_list), np.mean(train_meter.compute_metric('r2')), 
-        #                   np.mean(train_meter.compute_metric('mae')), np.mean(train_meter.compute_metric('spearmanr')), 
-        #                   np.mean(train_meter.compute_metric('kendalltau')), epoch_end_time - epoch_start_time])
-        self._log.append(['train', epoch+1, np.mean(loss_list), train_meter.compute_metric('roc_auc_score'), train_meter.compute_metric('f1_score'), 
-                     train_meter.compute_metric('recall_score'), train_meter.compute_metric('precision_score'), 
-                     train_meter.compute_metric('accuracy_score'), train_meter.compute_metric('confusion_matrix'),
-                     epoch_end_time - epoch_start_time])   
+
+        metrics = train_meter.compute_metrics(loss_list)
+        data = sum([['train', epoch+1], list(metrics.values()), [epoch_end_time - epoch_start_time]], [])
+        self._log.append(data)
         
     def _run_an_eval_epoch(self, model, data_loader, dataset, epoch):
         ''' Utility function for running an evaluation (validation/test) epoch
@@ -277,35 +285,29 @@ class multiclass_NN():
                 logits = self._predict(model, bg)
                 eval_meter.update(IDs, logits, labels, masks)
 
-                losslabels = labels
+                if self._dataset._ntask == 1:
+                    losslabels = labels
+                else:
+                    losslabels = labels.squeeze(dim=1).long()
+                
                 loss = (self._loss_criterion(logits, losslabels) * (masks != 0).float()).mean()
                 loss_list.append(loss.item())
 
         eval_end_time = datetime.now()
         
-        # metric_dict = {'rmse': np.mean(eval_meter.compute_metric('rmse')), 'L1loss': np.mean(loss_list), 'r2': np.mean(eval_meter.compute_metric('r2')), 
-        #                'mae': np.mean(eval_meter.compute_metric('mae')), 'spearmanr': np.mean(eval_meter.compute_metric('spearmanr')), 
-        #                'kendalltau': np.mean(eval_meter.compute_metric('kendalltau'))}
-        metric_dict = {'loss': np.mean(loss_list), 'ROC-AUC': eval_meter.compute_metric('roc_auc_score'),
-               'F1': eval_meter.compute_metric('f1_score'), 'recall': eval_meter.compute_metric('recall_score'),
-               'precision': eval_meter.compute_metric('precision_score'), 'accuracy': eval_meter.compute_metric('accuracy_score'),
-               'confusion_matrix': eval_meter.compute_metric('confusion_matrix')}
-        
-        data = sum([[dataset, epoch+1], list(metric_dict.values()), [eval_end_time - eval_start_time]], [])
+        metrics = eval_meter.compute_metrics(loss_list)
+        data = sum([[dataset, epoch+1], list(metrics.values()), [eval_end_time - eval_start_time]], [])
         self._log.append(data)
 
-        IDs, mask, y_pred, y_true = eval_meter._finalize(include_IDs = True)
+        IDs, mask, logits, y_true = eval_meter._finalize()
 
-        y_pred = torch.FloatTensor(torch.sigmoid(y_pred).numpy()) * (mask != 0).float()
-        y_pred = y_pred.numpy().ravel()
-        # y_pred = self._dataset.scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten() # comment for binary classification
-        
-        mask = mask.numpy().ravel()
-        y_true = y_true.numpy().ravel()
-        # y_true = self._dataset.scaler.inverse_transform(y_true.reshape(-1, 1)).flatten() # comment for binary classification
+        mask = mask.ravel().long()
+        y_probs = logits.softmax(dim=1)
+        y_pred = logits.argmax(dim=1).long()
+        y_true = y_true.ravel().long()
                         
-        return metric_dict, [IDs, mask, y_pred, y_true]
-        
+        return metrics, [IDs, mask, y_probs, y_pred, y_true]
+
     def _predict(self, model, bg):
         ''' Utility function for moving batched graph and node/edge feats to device
         
@@ -347,11 +349,10 @@ class multiclass_NN():
         stopper = Stopper_v2(savepath=self._model_path, mode='lower', patience=self._exp_config['patience'], filename=tmppath.name)
 
         for epoch in range(self._num_epochs):
-            print(epoch + 1)
+            # print(epoch + 1)
             self._run_a_train_epoch(epoch, model, train_loader, optimizer)
             val_score = self._run_an_eval_epoch(model, val_loader, dataset = 'val', epoch = epoch)[0] 
 
-            # early_stop = stopper.step(val_score['rmse'], model, optimizer, self._model_name, self._save_model, self._save_opt)  
             early_stop = stopper.step(val_score['loss'], model, optimizer, self._model_name, self._save_model, self._save_opt)  
             
             if early_stop:
@@ -377,34 +378,36 @@ class multiclass_NN():
         
         self.model = model
 
-        # self.plot_parity(test_score[1])
-        self.rocauc_plot(test_score[1])
-        self.prauc_plot(test_score[1])
-        self.cm_plot(test_score[1])
+        results_df = self.export_results(test_score[1])
         
-        self.export_results(test_score[1])
+        self.cm_plot(results_df)
+        self.rocauc_plot(results_df)
+        self.prauc_plot(results_df)
 
-        # return test_score[0]['rmse']
-        return -test_score[0]['ROC-AUC']
+        # if n_tasks =1: return -test_score[0]['roc_auc_avg']; else
+        return -test_score[0]['0vr_roc_auc']
     
     def export_results(self, data):
         
-        IDs, mask, y_pred, y_true = data
+        IDs, mask, y_probs, y_pred, y_true = data
 
         df = pd.DataFrame({'ID': IDs,
+                           'y_probs': y_probs.tolist(),
                            'y_pred': y_pred.tolist(),
                            'y_true': y_true.tolist(),
                             'mask': mask.tolist()
                           })
 
         df.to_csv(self._model_path + '/results.txt', index=False)
+
+        return df
+    
+    ### MAKE SEPARATE FILE FOR PLOTS
         
     def plot_loss(self, df):
 
         epochs = df['epoch'].unique()
 
-        # train_loss = df[df['dataset'] == 'train']['rmse']
-        # val_loss = df[df['dataset'] == 'val']['rmse']
         train_loss = df[df['dataset'] == 'train']['loss']
         val_loss = df[df['dataset'] == 'val']['loss']
 
@@ -422,54 +425,22 @@ class multiclass_NN():
         plt.savefig(self._model_path + '/loss_fig.png')
         plt.close()
 
-    def plot_parity(self, data):
+    def cm_plot(self, df):
 
-        IDs, mask, y_pred, y_true = data
-        df = pd.DataFrame({'ID': IDs,
-                           'y_pred': y_pred.tolist(),
-                           'y_true': y_true.tolist(),
-                            'mask': mask.tolist()
-                          })
+        if self._dataset._ntask == 1:
+            lbs = [0,1]
+        else:
+            lbs = [ i for i in range(int(self._dataset._ntask))]
 
-        plt.scatter(df['y_true'].to_numpy(), df['y_pred'].to_numpy(), label='Predictions', alpha=0.7)
-
-        # Add the parity line (45-degree line)
-        plt.plot([df['y_true'].to_numpy().min(), df['y_true'].to_numpy().max()],
-                 [df['y_true'].to_numpy().min(), df['y_true'].to_numpy().max()], 'r--', label='Parity Line')
-        
-        # Add labels and legend
-        plt.xlabel('True Values')
-        plt.ylabel('Predicted Values')
-        plt.title('Parity Plot')
-        # plt.legend()
-        
-        # Show the plot
-        plt.savefig(self._model_path + '/parity_plot.png')
-        plt.close()
-        
-        return
-
-    def cm_plot(self, data):
-
-        IDs, mask, y_pred, y_true = data
-
-        df = pd.DataFrame({'ID': IDs,
-                   'y_pred': np.round(y_pred).tolist(),
-                   'y_true': y_true.tolist(),
-                    'mask': mask.tolist()
-                  })
-
-        lbs = [0,1]
-    
         if self._dataset._mixed == True:
             data1 = confusion_matrix(df['y_true'].to_numpy(), df['y_pred'].to_numpy(), labels=lbs)
             disp = ConfusionMatrixDisplay(confusion_matrix=data1)
             disp.plot()
             plt.savefig(self._model_path + '/CM_all.png')
             plt.close()
-    
+
         polymers = df[df["ID"].str.contains("poly", na=False)].copy()
-    
+
         # split once
         split_ID = polymers["ID"].str.split("_S", n=1, expand=True)
         
@@ -477,12 +448,12 @@ class multiclass_NN():
         polymers["ID"]     = split_ID[0]
         polymers["sample"] = split_ID[1].astype(int)
         data2 = confusion_matrix(polymers['y_true'].to_numpy(), polymers['y_pred'].to_numpy(), labels=lbs)
-    
+
         disp = ConfusionMatrixDisplay(confusion_matrix=data2)
         disp.plot()
         plt.savefig(self._model_path + '/CM_all_poly.png')
         plt.close()
-    
+
         grouped = (polymers
                    .groupby("ID", sort=False) # group on ID, keep first-seen order
                    .mean(numeric_only=True) # take the mean of all numeric columns
@@ -496,48 +467,16 @@ class multiclass_NN():
         grouped[num_cols] = grouped[num_cols].round().astype(int)
         
         data3 = confusion_matrix(grouped['y_true'].to_numpy(), grouped['y_pred'].to_numpy(), labels=lbs)
-    
+
         disp = ConfusionMatrixDisplay(confusion_matrix=data3)
         disp.plot()
-    
+
         plt.savefig(self._model_path + '/CM_poly_avg.png')
         plt.close()
-    
-        return
-
-    def prauc_plot(self, plotdata):
-        
-        _, _, y_pred, y_true = plotdata
-
-        # Compute precision-recall curve
-        precision, recall, _ = precision_recall_curve(y_true, y_pred)
-        
-        # Compute the average precision score (area under the precision-recall curve)
-        average_precision = average_precision_score(y_true, y_pred)
-        
-        # Plot Precision-Recall curve
-        plt.figure()
-        lw = 2
-        plt.plot(recall, precision, color='#2C7FFF', lw=lw, label='Precision-Recall curve')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('Recall', fontsize=18)
-        plt.ylabel('Precision', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.text(0.95, 0.03, 'Avg Precision = %0.2f' % (average_precision),
-                 verticalalignment='bottom', horizontalalignment='right',
-                 fontsize=18)
-        
-
-        plt.axhline(y=0.5, color='#B2B2B2', lw=lw, linestyle='--')
-
-        plt.tight_layout()
-        plt.savefig(self._model_path + '/PR_Curve.png')
-        plt.close()
 
         return
-    
-    def rocauc_plot(self, plotdata):
+
+    def rocauc_plot(self, df):
         ''' Plots ROC-AUC curve for classification task
         
         Args:
@@ -545,28 +484,82 @@ class multiclass_NN():
         fig_path : str, path to save figure
         '''
 
-        _, _, y_pred, y_true = plotdata
-        mean_fpr, mean_tpr, _ = roc_curve(y_true, y_pred)
+        probs = np.vstack(df['y_probs'].values)    # shape (n_samples, n_classes)
+        truth = np.array(df['y_true'].tolist())    # shape (n_samples,)
         
-        mean_tpr[-1] = 1.0
-        mean_auc = auc(mean_fpr, mean_tpr)
-
         plt.figure()
-        lw = 2
-        plt.plot(mean_fpr, mean_tpr, color='#2C7FFF',lw=lw)
-        plt.plot([0, 1], [0, 1], color='#B2B2B2', lw=lw, linestyle='--')
+        n_classes = probs.shape[1]
+        
+        for i in range(n_classes):
+            # one-vs-rest truth vector
+            bin_truth = (truth == i).astype(int)
+            class_probs = probs[:, i]
+        
+            # skip if y_true never equals this class in your data
+            if len(np.unique(bin_truth)) < 2:
+                continue
+        
+            fpr, tpr, _ = roc_curve(bin_truth, class_probs)
+            roc_auc    = auc(fpr, tpr)
+            plt.plot(fpr, tpr,
+                     lw=2,
+                     label=f"OVR Class {i} (AUC = {roc_auc:.3f})")
+        
+        # plot the chance diagonal
+        plt.plot([0, 1], [0, 1],
+                 linestyle="--",
+                 lw=2,
+                 color="#B2B2B2")
+        
+        plt.xlim(0, 1)
+        plt.ylim(0, 1.05)
+        plt.xlabel("False Positive Rate", fontsize=14)
+        plt.ylabel("True Positive Rate",  fontsize=14)
+        plt.title("ROC Curves (One-vs-Rest)",    fontsize=16)
+        plt.tick_params(labelsize=12)
+        plt.legend(loc="lower right", fontsize=12)
+        plt.tight_layout()
+        plt.savefig(self._model_path + "/ROC_AUC.png")
+        plt.close()
+ 
+        return
+
+    def prauc_plot(self, df):
+    
+        # stack the per-sample probability lists into an (N × C) array
+        y_probs = np.vstack(df['y_probs'].values)
+        y_true  = np.array(df['y_true'].tolist())
+    
+        n_classes = y_probs.shape[1]
+        plt.figure()
+    
+        for i in range(n_classes):
+            # binarize: 1 for class i, else 0
+            binary_targets = (y_true == i).astype(int)
+    
+            # skip if only one class present
+            if len(np.unique(binary_targets)) < 2:
+                continue
+    
+            probs_i = y_probs[:, i]
+            precision, recall, _ = precision_recall_curve(binary_targets, probs_i)
+            ap = average_precision_score(binary_targets, probs_i)
+    
+            plt.plot(
+                recall, precision,
+                lw=2,
+                label=f'OVR Class {i} (AP={ap:.3f})'
+            )
+    
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate', fontsize=18)
-        plt.ylabel('True Positive Rate', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.text(0.95, 0.03, 'ROC-AUC = %0.2f' % (mean_auc),
-        verticalalignment='bottom', horizontalalignment='right',
-        fontsize=18)
-        
+        plt.xlabel('Recall', fontsize=14)
+        plt.ylabel('Precision', fontsize=14)
+        plt.title('One-vs-Rest Precision-Recall Curves', fontsize=16)
+        plt.legend(loc="lower right", fontsize=12)
         plt.tight_layout()
-        plt.savefig(self._model_path + '/ROC_AUC.png')
+        plt.savefig(self._model_path + "/PR_Curve.png")
         plt.close()
-
-        return
         
+        return
+    
