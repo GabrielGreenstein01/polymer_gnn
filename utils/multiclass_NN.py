@@ -385,7 +385,7 @@ class multiclass_NN():
         self.export_results(test_score[1])
 
         # return test_score[0]['rmse']
-        return -test_score[0]['ROC-AUC']
+        return -test_score[0]['precision']
     
     def export_results(self, data):
         

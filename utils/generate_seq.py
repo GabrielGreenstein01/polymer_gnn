@@ -34,7 +34,7 @@ class Sample(object):
             x = np.random.uniform(0, 1)
             polymer.append(self._monomers[self.determine_monomer(x, self._cum_dist)])
 
-        polymer = ''.join(str(polymer))
+        polymer = ''.join(polymer)
         
         return polymer
 

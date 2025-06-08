@@ -43,6 +43,7 @@ if [ -f ~/.bashrc_executed ]; then
   pip install optunahub
   pip install HEBO
   pip install pyarrow
+  # pip install rdkit
 
   # Get the version of numpy-base
   # NUMPY_BASE_VERSION=\$(conda list numpy-base | grep numpy-base | awk '{print \$2}')
@@ -56,6 +57,10 @@ if [ -f ~/.bashrc_executed ]; then
 
   # Clone the GitHub repository
   git clone https://github.com/GabrielGreenstein01/polymer_gnn.git
+
+  # Install Jupyter kernel
+  # conda install ipykernel -y
+  # python -m ipykernel install --user --name GLAMOUR --display-name "GLAMOUR"
 
   # Source the updated bashrc again to make conda available immediately
   source ~/.bashrc
