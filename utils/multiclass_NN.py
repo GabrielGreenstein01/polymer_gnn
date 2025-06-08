@@ -347,7 +347,7 @@ class multiclass_NN():
         stopper = Stopper_v2(savepath=self._model_path, mode='lower', patience=self._exp_config['patience'], filename=tmppath.name)
 
         for epoch in range(self._num_epochs):
-            print(epoch + 1)
+            # print(epoch + 1)
             self._run_a_train_epoch(epoch, model, train_loader, optimizer)
             val_score = self._run_an_eval_epoch(model, val_loader, dataset = 'val', epoch = epoch)[0] 
 
