@@ -12,6 +12,9 @@ def shuffle_groups(df, group_column, SEED):
     return reordered_df.reset_index(drop=True)
 
 def get_idx(df, start_idx, set_len):
+    '''
+    Helper function for split. Used to get idx of db_file for where train/val/test sets end.
+    '''
     
     end_row = df.iloc[start_idx + set_len, :]
     end_group = end_row['group']
@@ -25,6 +28,10 @@ def get_idx(df, start_idx, set_len):
         return min(end_group_idx) - 1
 
 def split(db_file, SEED, SPLIT_RATIO, MIXED = True):
+    '''
+    Split data into {'mixed': BOOL, 'train': {ID: seq}, 'val': {...}, 'test': {...} }
+    mixed is removed in create_dataset_class.py before passed into mutliclass_NN object.
+    '''
     
     db = pd.read_csv(db_file)
 

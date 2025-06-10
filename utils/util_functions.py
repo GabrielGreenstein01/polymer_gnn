@@ -9,6 +9,10 @@ import torch
 
 
 def get_unscaled_features(SMILES, DESCRIPTORS):
+    '''
+    Get unscaled features of each monomer/bond from RDKit.
+    Output: {[Monomer Abbreviation]: [feature vector]}
+    '''
 
     df_smiles = pd.read_csv(SMILES)
     descriptors_to_keep = pd.read_json(DESCRIPTORS).to_dict(orient='records')[0]
@@ -21,13 +25,16 @@ def get_unscaled_features(SMILES, DESCRIPTORS):
         full_features = df_type['SMILES'].apply(
             lambda x: Descriptors.CalcMolDescriptors(Chem.MolFromSmiles(x), missingVal=-9999, silent=True)
         )
-        features = full_features.map(lambda x: np.array([x[key] for key in descriptors_to_keep[_type]]))
+        features = full_features.map(lambda x: np.array([x[key] for key in descriptors_to_keep[_type]])) # Remove unwanted features
         feats_dict = dict(zip(df_type['molecule'], features))
         unscaled_feats[_type] = feats_dict
     
     return unscaled_feats
 
 def seq_to_dgl(ID, sequence, features, model):
+    '''
+    Create and featurize a linear DGL graph given a sequence.
+    '''
 
         monomers = re.findall('[A-Z][^A-Z]*', sequence)
     

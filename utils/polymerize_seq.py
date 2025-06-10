@@ -7,6 +7,9 @@ from rdkit import Chem, RDLogger, rdBase
 from rdkit.Chem import AllChem, Descriptors, Draw
 
 class Polymerize(object):
+    '''
+    In-silico polymerization script for polymers.
+    '''
     def __init__(self, sample, SMILES):
         self._sample = sample # string of monomers
 

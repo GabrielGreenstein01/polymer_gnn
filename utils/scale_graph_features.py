@@ -15,6 +15,9 @@ from utils.util_functions import get_unscaled_features
 
 
 def scale_features(type_, molecules, unscaled_features):
+    '''
+    Fits MinMax scaler to train set and applies to validation and test sets.
+    '''
     
     mol_split = re.findall('[A-Z][^A-Z]*', molecules)
     unique_mols = list(set(mol_split))
@@ -52,6 +55,9 @@ def scale_features(type_, molecules, unscaled_features):
     return scaled_features
 
 def scale(train_set, SMILES, DESCRIPTORS):
+    '''
+    Scales Unscaled RDKit descriptors.
+    '''
     
     unscaled_feats = get_unscaled_features(SMILES,DESCRIPTORS)
 

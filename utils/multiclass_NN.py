@@ -32,32 +32,7 @@ from torch.optim import Adam
 class multiclass_NN():
     def __init__(self, dataset, MODEL, NUM_EPOCHS, NUM_WORKERS, DESCRIPTORS, CUSTOM_PARAMS, MODEL_PATH=None, SAVE_MODEL=False, SAVE_OPT=False, SAVE_CONFIG=False):
         '''
-        Initializes a MacroSupervised object
-        
-        Args:
-        MacroDataset: MacroDataset, MacroDataset object for DGL Dataset
-        MON_SMILES: str, path to .txt file of all monomers that comprise macromolecule and corresponding SMILES
-        BOND_SMILES: str, path to .txt file of all bonds that comprise macromolecule and corresponding SMILES
-        FEAT: str, type of attribute with which to featurizer nodes and edges of macromolecule
-        FP_BITS_MON: int, size of fingerprint bit-vector for monomer 
-        FP_BITS_BOND: int, size of fingerprint bit-vector for bond
-        SEED: int, random seed for shuffling dataset
-        MODEL: str, model architecture for supervised learning 
-        SPLIT: str, proportion of the dataset to use for training, validation and test
-        NUM_EPOCHS: int, maximum number of epochs allowed for training
-        NUM_WORKERS: int, number of processes for data loading
-        CUSTOM_PARAMS: dict, dictionary of custom hyperparameters
-        MODEL_PATH: str, path to save models and configuration files (default=None)
-        SAVE_MODEL: boolean, whether to save full model file (default=False)
-        SAVE_OPT: boolean, whether to save optimizer files (default=False)
-        SAVE_CONFIG: boolean, whether to save configuration file (default=False)
-        
-        Attributes:
-        train_set: Subset, Subset of graphs for model training
-        val_set: Subset, Subset of graphs for model validation
-        test_set: Subset, Subset of graphs used for model testing
-        model_load: dgllife model, Predictor with set hyperparameters
-        
+        Class where training is run.
         '''
         self._dataset = dataset
         
@@ -385,9 +360,12 @@ class multiclass_NN():
         self.export_results(test_score[1])
 
         # return test_score[0]['rmse']
-        return -test_score[0]['precision']
+        return -test_score[0]['precision'] # Output determines what objective will be hyperparameter optimized over
     
     def export_results(self, data):
+        '''
+        Export prediction results into results.txt
+        '''
         
         IDs, mask, y_pred, y_true = data
 
@@ -400,7 +378,9 @@ class multiclass_NN():
         df.to_csv(self._model_path + '/results.txt', index=False)
         
     def plot_loss(self, df):
-
+        '''
+        Plot loss curves.
+        '''
         epochs = df['epoch'].unique()
 
         # train_loss = df[df['dataset'] == 'train']['rmse']
@@ -423,6 +403,9 @@ class multiclass_NN():
         plt.close()
 
     def plot_parity(self, data):
+        '''
+        Plots parity plot (only used in regression).
+        '''
 
         IDs, mask, y_pred, y_true = data
         df = pd.DataFrame({'ID': IDs,
@@ -450,6 +433,10 @@ class multiclass_NN():
         return
 
     def cm_plot(self, data):
+        '''
+        Plots confusion matrix (threshold 0.5). Plots all polymer predictions, averaged polymer predictions,
+        and all peptide and polymer predictions when MIXED = True.
+        '''
 
         IDs, mask, y_pred, y_true = data
 
@@ -506,7 +493,9 @@ class multiclass_NN():
         return
 
     def prauc_plot(self, plotdata):
-        
+        '''
+        Plots Precision-Recall plot.
+        '''
         _, _, y_pred, y_true = plotdata
 
         # Compute precision-recall curve

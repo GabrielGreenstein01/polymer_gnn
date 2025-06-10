@@ -87,6 +87,9 @@ class infer:
         return IDs, bg
 
     def _predict(self, model, bg):
+        """
+        Get prediction from model.
+        """
         bg = bg.to(self._device)
         if self._exp_config["model"] in ["GCN", "GAT"]:
             node_feats = bg.ndata.pop("h").to(self._device)
@@ -108,10 +111,14 @@ class infer:
         return preds
 
     def run(self):
+        '''
+        Run inference on dataloader.
+        '''
 
         # data = list(zip(self._df["ID"], self._df["sequence"].apply(lambda x: seq_to_dgl(x))))
         data = list(zip(self._df["ID"], self._df["dgl"]))
 
+        # initialize dataloader
         data_loader = DataLoader(
             dataset=data, 
             batch_size= self._exp_config['batch_size'],
@@ -119,6 +126,7 @@ class infer:
             collate_fn=self._collate_molgraphs, 
             num_workers=self._num_workers)
         
+        # Evaluate model on dataloader
         preds = self._run_an_eval_epoch(self.model, data_loader)
 
         return preds

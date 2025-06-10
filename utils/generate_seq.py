@@ -5,6 +5,9 @@ import random
 import re
 
 class Sample(object):
+    """
+    Class that samples polymer sequences.
+    """
     def __init__(self, monomers, DP, mol_dist, sampling_method, n, batch = False):
         self._monomers = monomers
         self._DP = DP
@@ -24,11 +27,17 @@ class Sample(object):
         self.samples = self.generate_n_samples()
 
     def determine_monomer(self, x, cum_dist):
+        """
+        Invert CDF to determine monomer 
+        """
         for i, partition in enumerate(cum_dist):
             if x < partition:
                 return i
 
     def uniform_sample(self):
+        """
+        Uniformly sample from monomer distribution
+        """
         polymer = []
         for i in range(self._DP):
             x = np.random.uniform(0, 1)
@@ -39,6 +48,9 @@ class Sample(object):
         return polymer
 
     def sample_wo_replacement(self):
+        """
+        Sample without replacement. # of each monomer in sample is computed a priori from known polymer distribution.
+        """
 
         dist = self._num_of_monomers
     
@@ -54,6 +66,7 @@ class Sample(object):
 
 
     def generate_n_samples(self):
+        # Same as sample w/o replacement, but the # of each monomer is computed across all replicates instead of a single sequence
         if self._sampling_method == 'wo_replacement' and self._batch:
             sample = self.sample_wo_replacement()
     
